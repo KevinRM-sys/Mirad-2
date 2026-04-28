@@ -1,1 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Google Chrome</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700&display=swap');
 
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #00ff41;
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* CRT scan lines */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.15) 2px,
+        rgba(0,0,0,0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* Vignette */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.75) 100%);
+      pointer-events: none;
+      z-index: 998;
+    }
+
+    .screen {
+      width: min(860px, 96vw);
+      background: rgba(0,10,0,0.92);
+      border: 1px solid #00ff4155;
+      border-radius: 4px;
+      box-shadow: 0 0 40px #00ff4122, 0 0 80px #00ff4108, inset 0 0 60px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Title bar */
+    .titlebar {
+      background: #111a11;
+      border-bottom: 1px solid #00ff4133;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: #00ff4188;
+      letter-spacing: 1px;
+    }
+    .dot { width:11px; height:11px; border-radius:50%; display:inline-block; }
+    .dot.r { background: #ff5f57; }
+    .dot.y { background: #ffbd2e; }
+    .dot.g { background: #28c941; }
+    .titlebar-label { margin-left: auto; margin-right: auto; font-size: 11px; letter-spacing: 3px; opacity: .6; }
+
+    /* Terminal body */
+    .terminal {
+      padding: 18px 22px 22px;
+      height: 440px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .header-line {
+      font-family: 'Orbitron', monospace;
+      font-size: 18px;
+      color: #ff3333;
+      text-shadow: 0 0 14px #ff333399, 0 0 30px #ff333344;
+      letter-spacing: 4px;
+      margin-bottom: 4px;
+      animation: flicker 2.5s infinite;
+    }
+
+    @keyframes flicker {
+      0%,100%{ opacity:1 } 92%{ opacity:1 } 93%{ opacity:.3 } 95%{ opacity:1 } 97%{ opacity:.6 } 99%{ opacity:1 }
+    }
+
+    .sub-header {
+      font-size: 11px;
+      color: #ff333388;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+
+    #log-area {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .log-line {
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0;
+      animation: fadeIn .1s forwards;
+    }
+
+    @keyframes fadeIn { to { opacity: 1; } }
+
+    .log-line.del   { color: #ff4444; }
+    .log-line.scan  { color: #00ff41; }
+    .log-line.warn  { color: #ffcc00; }
+    .log-line.info  { color: #44ccff; }
+
+    /* Progress bar */
+    .progress-wrap {
+      margin-top: 14px;
+      border-top: 1px solid #00ff4122;
+      padding-top: 12px;
+    }
+    .progress-label {
+      font-size: 11px;
+      color: #ff444488;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .bar-track {
+      background: #111;
+      border: 1px solid #00ff4133;
+      height: 14px;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff2200, #ff6600, #ffcc00);
+      width: 0%;
+      transition: width .4s linear;
+      box-shadow: 0 0 8px #ff440088;
+    }
+
+    /* Console hint */
+    .hint {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 11px;
+      color: #ffcc0066;
+      letter-spacing: 2px;
+      animation: blink 1.4s step-start infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Overlay final */
+    #overlay {
+      position: absolute; inset: 0;
+      background: rgba(255,0,0,0.04);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+    }
+    #overlay.show { display: flex; }
+    #overlay .big { font-family:'Orbitron',monospace; font-size:28px; color:#ff2222; text-shadow:0 0 30px #ff2222; letter-spacing:6px; animation:flicker 1.5s infinite; }
+    #overlay .small { font-size:12px; color:#ff444488; letter-spacing:3px; }
+    #overlay .reveal { margin-top:20px; font-size:13px; color:#00ff41; letter-spacing:2px; text-align:center; }
+  </style>
+</head>
+<body>
+
+<div class="screen">
+  <div class="titlebar">
+    <span class="dot r"></span>
+    <span class="dot y"></span>
+    <span class="dot g"></span>
+    <span class="titlebar-label">SYSTEM_CLEANUP.exe — Administrador</span>
+  </div>
+
+  <div class="terminal">
+    <div class="header-line">⚠ INICIANDO ELIMINACIÓN DEL SISTEMA ⚠</div>
+    <div class="sub-header">TARGET: C:\Windows\System32 — ELIMINACIÓN TOTAL EN PROGRESO</div>
+
+    <div id="log-area"></div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>ELIMINANDO ARCHIVOS DEL SISTEMA...</span>
+        <span id="pct">0%</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="bar"></div></div>
+    </div>
+
+    <div class="hint">▶ ABRE LA CONSOLA DEL NAVEGADOR PARA VER LOS DETALLES (F12)</div>
+
+    <div id="overlay">
+      <div class="big">💀 ELIMINACIÓN COMPLETA 💀</div>
+      <div class="small">C:\Windows\System32 — 4,821 ARCHIVOS BORRADOS</div>
+      <div class="reveal">. . . . . . . . .<br><br>Nah, era broma 😂<br>No pasó absolutamente nada jajaja</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── Paths to "delete" ────────────────────────────────────────────────────
+  const paths = [
+    "C:\\Windows\\System32\\kernel32.dll",
+    "C:\\Windows\\System32\\ntoskrnl.exe",
+    "C:\\Windows\\System32\\hal.dll",
+    "C:\\Windows\\System32\\winlogon.exe",
+    "C:\\Windows\\System32\\lsass.exe",
+    "C:\\Windows\\System32\\svchost.exe",
+    "C:\\Windows\\System32\\csrss.exe",
+    "C:\\Windows\\System32\\smss.exe",
+    "C:\\Windows\\System32\\services.exe",
+    "C:\\Windows\\System32\\drivers\\ntfs.sys",
+    "C:\\Windows\\System32\\drivers\\tcpip.sys",
+    "C:\\Windows\\System32\\drivers\\afd.sys",
+    "C:\\Windows\\System32\\drivers\\wdf01000.sys",
+    "C:\\Windows\\System32\\advapi32.dll",
+    "C:\\Windows\\System32\\user32.dll",
+    "C:\\Windows\\System32\\gdi32.dll",
+    "C:\\Windows\\System32\\shell32.dll",
+    "C:\\Windows\\System32\\combase.dll",
+    "C:\\Windows\\System32\\rpcrt4.dll",
+    "C:\\Windows\\System32\\ucrtbase.dll",
+    "C:\\Windows\\System32\\msvcrt.dll",
+    "C:\\Windows\\System32\\wintrust.dll",
+    "C:\\Windows\\System32\\crypt32.dll",
+    "C:\\Windows\\System32\\sechost.dll",
+    "C:\\Windows\\System32\\cfgmgr32.dll",
+    "C:\\Windows\\System32\\setupapi.dll",
+    "C:\\Windows\\System32\\netapi32.dll",
+    "C:\\Windows\\System32\\winspool.drv",
+    "C:\\Windows\\System32\\en-US\\kernel32.dll.mui",
+    "C:\\Windows\\System32\\en-US\\ntoskrnl.exe.mui",
+    "C:\\Windows\\System32\\Tasks\\MicrosoftEdgeUpdateTaskMachineCore",
+    "C:\\Windows\\System32\\catroot\\{F750E6C3}\\Microsoft-Windows-Client-Desktop-Required.cat",
+    "C:\\Windows\\System32\\CodeIntegrity\\Bootcat.cache",
+    "C:\\Windows\\System32\\config\\SAM",
+    "C:\\Windows\\System32\\config\\SYSTEM",
+    "C:\\Windows\\System32\\config\\SOFTWARE",
+    "C:\\Windows\\System32\\config\\SECURITY",
+    "C:\\Windows\\System32\\wbem\\Repository\\OBJECTS.DATA",
+    "C:\\Windows\\System32\\winevt\\Logs\\System.evtx",
+    "C:\\Windows\\System32\\winevt\\Logs\\Application.evtx",
+    "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
+    "C:\\Windows\\System32\\spool\\drivers\\x64\\3\\mxdwdrv.dll",
+    "C:\\Windows\\System32\\boot\\bootmgr",
+    "C:\\Windows\\System32\\recovery\\WinRE.wim",
+    "C:\\Windows\\System32\\oobe\\Setup.exe",
+  ];
+
+  // ─── Console spam ─────────────────────────────────────────────────────────
+  console.clear();
+  console.log('%c⚠ ADVERTENCIA DEL SISTEMA ⚠', 'color:red; font-size:24px; font-weight:bold; text-shadow: 0 0 6px red;');
+  console.log('%cINICIANDO ELIMINACIÓN DE C:\\Windows\\System32...', 'color:orange; font-size:14px;');
+  console.log('%cEsta operación NO se puede deshacer.', 'color:yellow; font-size:12px;');
+  console.groupCollapsed('%c▶ ARCHIVOS EN COLA DE ELIMINACIÓN', 'color:#888; font-size:11px;');
+  paths.forEach(p => console.log(`%c  [COLA] ${p}`, 'color:#555;'));
+  console.groupEnd();
+  console.log(' ');
+
+  let i = 0;
+  const total = paths.length;
+  const bar = document.getElementById('bar');
+  const pct = document.getElementById('pct');
+  const logArea = document.getElementById('log-area');
+  const MAX_LINES = 16;
+
+  function addLine(text, cls) {
+    const el = document.createElement('div');
+    el.className = `log-line ${cls}`;
+    el.textContent = text;
+    logArea.appendChild(el);
+    // Keep only last MAX_LINES
+    while (logArea.children.length > MAX_LINES) logArea.removeChild(logArea.firstChild);
+  }
+
+  function step() {
+    if (i >= total) {
+      // Done!
+      console.log(' ');
+      console.log('%c💀 ELIMINACIÓN COMPLETADA — 4,821 archivos borrados 💀', 'color:red; font-size:18px; font-weight:bold;');
+      console.log(' ');
+      console.log('%c... Nah, era broma 😂', 'color:#00ff41; font-size:16px; font-weight:bold;');
+      console.log('%cNo pasó absolutamente NADA. Tu PC está perfectamente bien 🙃', 'color:#00ff41; font-size:13px;');
+      document.getElementById('overlay').classList.add('show');
+      return;
+    }
+
+    const path = paths[i];
+    const progress = Math.round(((i + 1) / total) * 100);
+
+    // Console entry
+    console.log(`%c[ELIMINADO] ${path}`, 'color:#ff4444; font-family:monospace;');
+
+    // UI entry
+    addLine(`[DEL] ${path}`, 'del');
+    if (i % 4 === 0) addLine(`[SCAN] Escaneando subcarpeta... ${Math.floor(Math.random()*999)} archivos encontrados`, 'scan');
+    if (i % 7 === 0) addLine(`[WARN] Archivo crítico del sistema detectado — ignorando protecciones...`, 'warn');
+    if (i % 10 === 0) addLine(`[INFO] Escribiendo log de auditoría en memoria...`, 'info');
+
+    bar.style.width = progress + '%';
+    pct.textContent = progress + '%';
+
+    i++;
+    const delay = 80 + Math.random() * 120;
+    setTimeout(step, delay);
+  }
+
+  // Kick off after 1 second
+  setTimeout(() => {
+    addLine('[INIT] Conectando con servicios del sistema...', 'info');
+    addLine('[INIT] Verificando permisos de administrador... OK', 'info');
+    addLine('[INIT] Cargando lista de rutas objetivo...', 'scan');
+    setTimeout(step, 900);
+  }, 800);
+</script>
+</body>
+</html>
